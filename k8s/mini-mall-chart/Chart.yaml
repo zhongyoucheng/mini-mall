@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mini-mall
+description: mini-mall 电商订单系统 Helm Chart
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

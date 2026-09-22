@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  labels:
+    app: product-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+    spec:
+      containers:
+        - name: product-service
+          image: 192.168.1.2:8888/mini-mall/product-service:v1
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8083
+          env:
+            - name: NACOS_ADDR
+              valueFrom:
+                configMapKeyRef:
+                  name: mini-mall-config
+                  key: NACOS_ADDR
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: mini-mall-config
+                  key: DB_HOST
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mini-mall-secret
+                  key: DB_PASSWORD
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: mini-mall-config
+                  key: REDIS_HOST
+            - name: JAVA_OPTS
+              value: "-Xms128m -Xmx128m -XX:+UseG1GC"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://192.168.1.2:3307/mini_mall_product?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: product-service
+  ports:
+    - port: 8083
+      targetPort: 8083

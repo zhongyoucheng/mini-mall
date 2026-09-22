@@ -1,0 +1,13 @@
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/ProductServiceApplication.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/common/BusinessException.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/common/GlobalExceptionHandler.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/common/Result.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/config/RedisConfig.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/controller/HealthController.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/controller/ProductController.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/dto/ProductRequest.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/mapper/ProductMapper.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/mapper/StockMapper.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/model/Product.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/model/Stock.java
+/Users/zhongyoucheng/Documents/java_project/mini-mall/product-service/src/main/java/com/minimall/product/service/ProductService.java

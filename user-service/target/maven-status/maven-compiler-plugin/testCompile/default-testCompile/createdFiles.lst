@@ -1,0 +1,3 @@
+com/minimall/user/controller/UserControllerTest.class
+com/minimall/user/util/JwtUtilTest.class
+com/minimall/user/service/UserServiceTest.class

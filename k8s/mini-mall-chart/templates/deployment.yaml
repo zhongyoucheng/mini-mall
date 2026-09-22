@@ -1,0 +1,51 @@
+{{- range $name, $svc := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $svc.name }}
+  labels:
+    app: {{ $svc.name }}
+spec:
+  replicas: {{ $svc.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $svc.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $svc.name }}
+    spec:
+      containers:
+        - name: {{ $svc.name }}
+          image: "{{ $.Values.registry }}/mini-mall/{{ $svc.image }}:{{ $.Values.imageTag }}"
+          imagePullPolicy: Never
+          ports:
+            - containerPort: {{ $svc.port }}
+          env:
+            - name: NACOS_ADDR
+              value: "{{ $.Values.config.hostIp }}:{{ $.Values.config.nacosPort }}"
+            - name: DB_HOST
+              value: "{{ $.Values.config.hostIp }}"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mini-mall-secret
+                  key: DB_PASSWORD
+            - name: REDIS_HOST
+              value: "{{ $.Values.config.hostIp }}"
+            - name: JAVA_OPTS
+              value: "{{ $.Values.javaOpts }}"
+            {{- if $svc.jdbcDb }}
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://{{ $.Values.config.hostIp }}:{{ $.Values.config.dbPort }}/{{ $svc.jdbcDb }}?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true"
+            {{- end }}
+            {{- if $svc.extraEnv }}
+            {{- range $svc.extraEnv }}
+            - name: {{ .name }}
+              value: {{ tpl .value $ | quote }}
+            {{- end }}
+            {{- end }}
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+{{- end }}

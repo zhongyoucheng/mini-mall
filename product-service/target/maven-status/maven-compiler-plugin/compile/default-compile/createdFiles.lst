@@ -1,0 +1,13 @@
+com/minimall/product/common/GlobalExceptionHandler.class
+com/minimall/product/controller/ProductController.class
+com/minimall/product/common/Result.class
+com/minimall/product/dto/ProductRequest.class
+com/minimall/product/service/ProductService.class
+com/minimall/product/mapper/StockMapper.class
+com/minimall/product/mapper/ProductMapper.class
+com/minimall/product/controller/HealthController.class
+com/minimall/product/config/RedisConfig.class
+com/minimall/product/model/Product.class
+com/minimall/product/model/Stock.class
+com/minimall/product/common/BusinessException.class
+com/minimall/product/ProductServiceApplication.class

@@ -1,0 +1,70 @@
+# 全局
+registry: "192.168.1.2:8888"
+imageTag: "v1"
+javaOpts: "-Xms128m -Xmx128m -XX:+UseG1GC"
+
+# 资源请求（HPA 必须）
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# 基础设施地址
+# hostIp: 宿主机 IP，由 deploy.sh 动态注入
+# 如果未注入，默认使用 host.minikube.internal（minikube 内置域名，指向宿主机）
+config:
+  hostIp: "host.minikube.internal"
+  nacosPort: "8848"
+  dbPort: "3307"
+
+secret:
+  dbPassword: "zyC191380!!"
+  jwtSecret: "mini-mall-jwt-secret-key-must-be-at-least-32-bytes-long"
+
+# 4 个微服务配置
+services:
+  gateway:
+    name: gateway
+    image: gateway-service
+    port: 8080
+    replicas: 1
+    extraEnv:
+      - name: JWT_SECRET
+        value: "{{ .Values.secret.jwtSecret }}"
+
+  user-service:
+    name: user-service
+    image: user-service
+    port: 8081
+    replicas: 1
+    jdbcDb: "mini_mall_user"
+    extraEnv:
+      - name: JWT_SECRET
+        value: "{{ .Values.secret.jwtSecret }}"
+      - name: JWT_EXPIRATION
+        value: "86400000"
+
+  product-service:
+    name: product-service
+    image: product-service
+    port: 8083
+    replicas: 1
+    jdbcDb: "mini_mall_product"
+
+  order-service:
+    name: order-service
+    image: order-service
+    port: 8082
+    replicas: 1
+    jdbcDb: "mini_mall_order"
+    extraEnv:
+      - name: RABBITMQ_HOST
+        value: "{{ .Values.config.hostIp }}"
+
+# Ingress
+ingress:
+  enabled: true
+  host: mini-mall.local

@@ -1,0 +1,237 @@
+services:
+  # ========== 基础设施 ==========
+  mysql:
+    image: mysql:8.0
+    container_name: mini-mall-mysql
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: 2.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-zyC191380!!}
+      MYSQL_DATABASE: mini_mall_order
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./sql:/docker-entrypoint-initdb.d   # 启动时自动执行建表 SQL
+      - mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_PASSWORD:-zyC191380!!}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: mini-mall-redis
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: mini-mall-rabbitmq
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+    ports:
+      - "5672:5672"      # AMQP 协议端口
+      - "15672:15672"    # 管理界面
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nacos:
+    image: nacos/nacos-server:v2.4.3
+    container_name: mini-mall-nacos
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+    ports:
+      - "8848:8848"
+      - "9848:9848"   # gRPC 端口
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============ 微服务 ============
+  gateway-service:
+    build:
+      context: .
+      dockerfile: gateway-service/Dockerfile
+    container_name: mini-mall-gateway
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+    ports:
+      - "8090:8080"   # 宿主机 8090（避开 TeleAgent 占用的 8080）→ 容器 8080
+    environment:
+      NACOS_ADDR: nacos:8848
+      JWT_SECRET: ${JWT_SECRET:-mini-mall-jwt-secret-key-must-be-at-least-32-bytes-long}
+      JAVA_OPTS: "-Xms256m -Xmx256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/app/gc.log:time -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/dump.hprof"
+    depends_on:
+      nacos:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo ok' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    container_name: mini-mall-user
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+    ports:
+      - "8081:8081"
+    environment:
+      NACOS_ADDR: nacos:8848
+      DB_HOST: mysql
+      DB_PASSWORD: ${MYSQL_PASSWORD:-zyC191380!!}
+      REDIS_HOST: redis
+      JWT_SECRET: ${JWT_SECRET:-mini-mall-jwt-secret-key-must-be-at-least-32-bytes-long}
+      JWT_EXPIRATION: 86400000
+      JAVA_OPTS: "-Xms256m -Xmx256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/app/gc.log:time -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/dump.hprof"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8081 && echo ok' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  product-service:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+    container_name: mini-mall-product
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+    ports:
+      - "8083:8083"
+    environment:
+      NACOS_ADDR: nacos:8848
+      DB_HOST: mysql
+      DB_PASSWORD: ${MYSQL_PASSWORD:-zyC191380!!}
+      REDIS_HOST: redis
+      JAVA_OPTS: "-Xms256m -Xmx256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/app/gc.log:time -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/dump.hprof"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8083 && echo ok' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    container_name: mini-mall-order
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+    ports:
+      - "8082:8082"
+    environment:
+      NACOS_ADDR: nacos:8848
+      DB_HOST: mysql
+      DB_PASSWORD: ${MYSQL_PASSWORD:-zyC191380!!}
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      JAVA_OPTS: "-Xms256m -Xmx256m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xlog:gc*:file=/app/gc.log:time -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/dump.hprof"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8082 && echo ok' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mysql-data:
