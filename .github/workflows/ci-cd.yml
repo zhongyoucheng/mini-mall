@@ -24,10 +24,10 @@ jobs:
 
       - name: Docker Build
         run: |
-          docker build -t $HARBOR_URL/mini-mall/gateway-service:$IMAGE_TAG gateway-service/
-          docker build -t $HARBOR_URL/mini-mall/user-service:$IMAGE_TAG user-service/
-          docker build -t $HARBOR_URL/mini-mall/product-service:$IMAGE_TAG product-service/
-          docker build -t $HARBOR_URL/mini-mall/order-service:$IMAGE_TAG order-service/
+          docker build -t $HARBOR_URL/mini-mall/gateway-service:$IMAGE_TAG -f gateway-service/Dockerfile .
+          docker build -t $HARBOR_URL/mini-mall/user-service:$IMAGE_TAG -f user-service/Dockerfile .
+          docker build -t $HARBOR_URL/mini-mall/product-service:$IMAGE_TAG -f product-service/Dockerfile .
+          docker build -t $HARBOR_URL/mini-mall/order-service:$IMAGE_TAG -f order-service/Dockerfile .
 
       - name: Push to Harbor
         run: |
