@@ -1,0 +1,59 @@
+name: mini-mall CI/CD
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  HARBOR_URL: ${{ secrets.HARBOR_URL }}
+  HARBOR_USER: ${{ secrets.HARBOR_USER }}
+  HARBOR_PASS: ${{ secrets.HARBOR_PASS }}
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Maven Build
+        run: |
+          /Users/zhongyoucheng/tools/apache-maven-3.9.16/bin/mvn clean package -DskipTests
+
+      - name: Docker Build
+        run: |
+          docker build -t $HARBOR_URL/mini-mall/gateway-service:$IMAGE_TAG gateway-service/
+          docker build -t $HARBOR_URL/mini-mall/user-service:$IMAGE_TAG user-service/
+          docker build -t $HARBOR_URL/mini-mall/product-service:$IMAGE_TAG product-service/
+          docker build -t $HARBOR_URL/mini-mall/order-service:$IMAGE_TAG order-service/
+
+      - name: Push to Harbor
+        run: |
+          echo "$HARBOR_PASS" | docker login $HARBOR_URL -u "$HARBOR_USER" --password-stdin
+          docker push $HARBOR_URL/mini-mall/gateway-service:$IMAGE_TAG
+          docker push $HARBOR_URL/mini-mall/user-service:$IMAGE_TAG
+          docker push $HARBOR_URL/mini-mall/product-service:$IMAGE_TAG
+          docker push $HARBOR_URL/mini-mall/order-service:$IMAGE_TAG
+
+      - name: Load to minikube
+        run: |
+          minikube image load $HARBOR_URL/mini-mall/gateway-service:$IMAGE_TAG
+          minikube image load $HARBOR_URL/mini-mall/user-service:$IMAGE_TAG
+          minikube image load $HARBOR_URL/mini-mall/product-service:$IMAGE_TAG
+          minikube image load $HARBOR_URL/mini-mall/order-service:$IMAGE_TAG
+
+      - name: Deploy to K8s
+        run: |
+          HOST_IP=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}' | xargs ipconfig getifaddr)
+          helm upgrade --install mini-mall ./k8s/mini-mall-chart \
+            --set config.hostIp=$HOST_IP \
+            --set imageTag=$IMAGE_TAG \
+            --wait --timeout 300s
+
+      - name: Verify
+        run: |
+          kubectl get pods -l app=gateway
+          kubectl get pods -l app=user-service
+          echo "部署完成，镜像版本: $IMAGE_TAG"
