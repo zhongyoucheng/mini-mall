@@ -1,4 +1,0 @@
-com/minimall/gateway/config/GatewayConfig.class
-com/minimall/gateway/config/SentinelRuleConfig.class
-com/minimall/gateway/GatewayApplication.class
-com/minimall/gateway/filter/AuthGlobalFilter.class
