@@ -18,6 +18,15 @@ spring:
     port: 5672
     username: guest
     password: guest
+    listener:
+      simple:
+        acknowledge-mode: manual    # 手动 ACK（默认 auto）
+        prefetch: 1                 # 每次只取 1 条，限流保护 DB
+        retry:
+          enabled: true
+          max-attempts: 3           # 最多重试 3 次
+          initial-interval: 1000    # 首次重试间隔 1s
+          multiplier: 2.0           # 间隔倍增（1s → 2s → 4s）
   cloud:
     nacos:
       discovery:
