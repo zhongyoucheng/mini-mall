@@ -24,6 +24,12 @@ public class OrderController {
         return Result.success(orderService.createOrder(req));
     }
 
+    /** 异步下单（Redis 预扣 + MQ 削峰） */
+    @PostMapping("/async")
+    public Result<OrderResponse> asyncCreateOrder(@Valid @RequestBody OrderRequest req) {
+        return Result.success(orderService.asyncCreateOrder(req));
+    }
+
     /** 订单详情（含明细） */
     @GetMapping("/{id}")
     public Result<OrderResponse> getById(@PathVariable Long id) {

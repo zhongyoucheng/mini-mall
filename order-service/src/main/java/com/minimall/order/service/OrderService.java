@@ -9,6 +9,8 @@ import com.minimall.order.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,19 @@ public class OrderService {
     private final OrderLogMapper orderLogMapper;
     private final ProductClient productClient;
     private final RabbitTemplate rabbitTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
+
+    private static final String STOCK_KEY_PREFIX = "stock:";
+
+    private static final String DEDUCT_STOCK_LUA =
+            "local s = tonumber(redis.call('GET', KEYS[1])) " +
+            "local c = tonumber(ARGV[1]) " +
+            "if s and s >= c then " +
+            "    redis.call('DECRBY', KEYS[1], c) " +
+            "    return s - c " +
+            "else " +
+            "    return -1 " +
+            "end";
 
     /**
      * 下单
@@ -104,7 +119,8 @@ public class OrderService {
                 order.getId(),
                 order.getOrderNo(),
                 order.getUserId(),
-                order.getTotalAmount());
+                order.getTotalAmount(),
+                null);
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, RabbitConfig.ROUTING_KEY, message);
         log.info("下单成功，已发送 MQ 消息: orderNo={}", orderNo);
 
@@ -128,6 +144,84 @@ public class OrderService {
         }
         resp.setItems(respItems);
         return resp;
+    }
+
+    /**
+     * 异步下单：Redis Lua 预扣库存 + 发 MQ + 立即返回"排队中"
+     */
+    public OrderResponse asyncCreateOrder(OrderRequest req) {
+        // 1. Redis Lua 预扣库存（原子防超卖）
+        List<Long> deductedProductIds = new ArrayList<>();
+        List<Integer> deductedQuantities = new ArrayList<>();
+
+        for (OrderRequest.OrderItemRequest itemReq : req.getItems()) {
+            Long productId = itemReq.getProductId();
+            int quantity = itemReq.getQuantity();
+            String key = STOCK_KEY_PREFIX + productId;
+            DefaultRedisScript<Long> script = new DefaultRedisScript<>(DEDUCT_STOCK_LUA, Long.class);
+            Long result = stringRedisTemplate.execute(script, List.of(key), String.valueOf(quantity));
+
+            if (result == null || result < 0) {
+                // 预扣失败 → 回滚已预扣的库存
+                rollbackDeductions(deductedProductIds, deductedQuantities);
+                throw new BusinessException(503, "库存不足，秒杀失败: productId=" + productId);
+            }
+
+            deductedProductIds.add(productId);
+            deductedQuantities.add(quantity);
+        }
+
+        // 2. 构造商品明细快照（查商品信息）
+        List<OrderMessage.OrderMessageItem> messageItems = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        try {
+            for (OrderRequest.OrderItemRequest itemReq : req.getItems()) {
+                FeignResult<ProductDTO> productResult = productClient.getProduct(itemReq.getProductId());
+                if (productResult.getCode() != 200 || productResult.getData() == null) {
+                    throw new BusinessException(400, "商品不存在或商品服务不可用: " + itemReq.getProductId());
+                }
+                ProductDTO product = productResult.getData();
+
+                BigDecimal subTotal = product.getPrice().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+                OrderMessage.OrderMessageItem msgItem = new OrderMessage.OrderMessageItem();
+                msgItem.setProductId(product.getId());
+                msgItem.setProductName(product.getName());
+                msgItem.setPrice(product.getPrice());
+                msgItem.setQuantity(itemReq.getQuantity());
+                msgItem.setSubTotal(subTotal);
+                messageItems.add(msgItem);
+                totalAmount = totalAmount.add(subTotal);
+            }
+        } catch (Exception e) {
+            // 构造消息失败 → 回滚 Redis 预扣
+            rollbackDeductions(deductedProductIds, deductedQuantities);
+            throw e;
+        }
+
+        // 3. 生成订单号（不写 DB，等消费端处理）
+        String orderNo = generateOrderNo();
+
+        // 4. 发 MQ 消息（消费端异步写 DB）
+        OrderMessage message = new OrderMessage(null, orderNo, req.getUserId(), totalAmount, messageItems);
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, RabbitConfig.ROUTING_KEY, message);
+
+        // 5. 立即返回"排队中"
+        OrderResponse resp = new OrderResponse();
+        resp.setOrderNo(orderNo);
+        resp.setUserId(req.getUserId());
+        resp.setTotalAmount(totalAmount);
+        resp.setStatus(0); // 0=排队中
+        log.info("异步下单：已发 MQ，orderNo={}", orderNo);
+        return resp;
+    }
+
+    /** 回滚 Redis 预扣库存 */
+    private void rollbackDeductions(List<Long> productIds, List<Integer> quantities) {
+        for (int i = 0; i < productIds.size(); i++) {
+            String key = STOCK_KEY_PREFIX + productIds.get(i);
+            stringRedisTemplate.opsForValue().increment(key, quantities.get(i));
+        }
     }
 
     /**
@@ -251,7 +345,7 @@ public class OrderService {
 
         // 发 MQ 通知
         OrderMessage message = new OrderMessage(
-                order.getId(), order.getOrderNo(), order.getUserId(), order.getTotalAmount());
+                order.getId(), order.getOrderNo(), order.getUserId(), order.getTotalAmount(), null);
         rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, RabbitConfig.ROUTING_KEY, message);
     }
 
