@@ -18,6 +18,10 @@ spring:
     port: 5672
     username: guest
     password: guest
+    publisher-confirm-type: correlated  # 生产者异步确认
+    publisher-returns: true             # 开启路由失败回调
+    template:
+      mandatory: true                   # 路由失败时触发 Return 回调
     listener:
       simple:
         acknowledge-mode: manual    # 手动 ACK（默认 auto）
