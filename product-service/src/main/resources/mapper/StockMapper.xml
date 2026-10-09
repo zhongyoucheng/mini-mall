@@ -20,6 +20,10 @@
         SELECT * FROM t_stock WHERE product_id = #{productId}
     </select>
 
+    <select id="findAll" resultMap="StockMap">
+        SELECT * FROM t_stock
+    </select>
+
     <update id="updateQuantity">
         UPDATE t_stock SET quantity = #{quantity} WHERE product_id = #{productId}
     </update>

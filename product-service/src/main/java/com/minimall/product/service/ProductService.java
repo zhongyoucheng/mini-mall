@@ -147,6 +147,11 @@ public class ProductService {
         return productMapper.findAll();
     }
 
+    /** 库存列表（供对账拉取全量库存） */
+    public List<Stock> listStocks() {
+        return stockMapper.findAll();
+    }
+
     /** 修改商品（Cache Aside 写流程：先更新 DB 再删缓存） */
     public void updateProduct(Long id, ProductRequest req) {
         Product product = productMapper.findById(id);
@@ -201,6 +206,17 @@ public class ProductService {
             throw new BusinessException(404, "库存记录不存在");
         }
         redisTemplate.opsForValue().set(STOCK_KEY_PREFIX + productId, stock.getQuantity());
+    }
+
+    /** 全量库存预热：遍历所有商品，把 MySQL 库存同步到 Redis */
+    public void warmupAllStocks() {
+        List<Stock> stocks = stockMapper.findAll();
+        for (Stock stock : stocks) {
+            String key = STOCK_KEY_PREFIX + stock.getProductId();
+            redisTemplate.opsForValue().set(key, stock.getQuantity());
+            log.info("[预热] productId={}, 库存同步到 Redis: {}", stock.getProductId(), stock.getQuantity());
+        }
+        log.info("[预热] 全量库存预热完成，共 {} 个商品", stocks.size());
     }
 
     /** 库存回滚：下游 MySQL 落库失败时，Redis INCR 补偿 */

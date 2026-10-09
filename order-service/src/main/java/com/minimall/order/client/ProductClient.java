@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+
 /**
  * Feign 客户端：调用 product-service
  * name = "product-service" 必须与 Nacos 注册名一致
@@ -25,6 +27,10 @@ public interface ProductClient {
     /** 查库存 */
     @GetMapping("/products/{id}/stock")
     FeignResult<StockDTO> getStock(@PathVariable("id") Long id);
+
+    /** 查全部库存（对账用） */
+    @GetMapping("/products/stocks")
+    FeignResult<List<StockDTO>> listStocks();
 }
 
 /**
@@ -51,6 +57,15 @@ class ProductClientFallbackFactory implements FallbackFactory<ProductClient> {
             @Override
             public FeignResult<StockDTO> getStock(Long id) {
                 return FeignResult.<StockDTO>builder()
+                        .code(503)
+                        .message("商品服务不可用")
+                        .data(null)
+                        .build();
+            }
+
+            @Override
+            public FeignResult<List<StockDTO>> listStocks() {
+                return FeignResult.<List<StockDTO>>builder()
                         .code(503)
                         .message("商品服务不可用")
                         .data(null)

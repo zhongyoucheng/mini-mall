@@ -56,4 +56,10 @@ public class ProductController {
     public Result<Stock> getStock(@PathVariable Long id) {
         return Result.success(productService.getStock(id));
     }
+
+    /** 查询全部库存（供 order-service 对账调用） */
+    @GetMapping("/stocks")
+    public Result<List<Stock>> listStocks() {
+        return Result.success(productService.listStocks());
+    }
 }
