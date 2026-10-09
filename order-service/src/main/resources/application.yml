@@ -5,7 +5,7 @@ spring:
   application:
     name: order-service
   datasource:
-    url: jdbc:mysql://${DB_HOST:127.0.0.1}:3306/mini_mall_order?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3307}/mini_mall_order?useSSL=false&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: ${DB_PASSWORD:zyC191380!!}
     driver-class-name: com.mysql.cj.jdbc.Driver
